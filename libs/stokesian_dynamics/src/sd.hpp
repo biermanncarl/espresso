@@ -1477,6 +1477,8 @@ struct solver {
         assert(a_host.size() == n_part);
         vector_type<T> a(a_host.begin(), a_host.end());
 
+        device_matrix<T, Policy>::initialize_gpu_libraries();
+
         // TODO: More efficient!
         // generate lookup table of all pairs
         device_matrix<std::size_t, Policy> part_id(2, n_pair);
@@ -1554,6 +1556,7 @@ struct solver {
         // The square root of R_FU is a byproduct of the matrix inversion,
         // which we use for the thermalization
         device_matrix<T, Policy> rfu_sqrt;
+
         // 6. invert resistance matrix to obtain mobility matrix
         // The grand mobility matrix is now finished.
         thrust_wrapper::tie(rfu_inv, rfu_sqrt) = rfu.inverse_and_cholesky();
@@ -1584,6 +1587,10 @@ struct solver {
         // return the velocities due to hydrodynamic interactions
         std::vector<T> out(u.size());
         thrust_wrapper::copy(u.begin(), u.end(), out.begin());
+
+        // TODO: move this somewhere else where it is only called once at the
+        // end of the whole program.
+        device_matrix<T, Policy>::destroy_gpu_libraries();
 
         return out;
     }

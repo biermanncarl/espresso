@@ -102,6 +102,18 @@ int dpotrs_(char *uplo, int *n, int *nrhs, double *a, int *lda, double *b,
 
 namespace internal {
 
+// handle types for GPU libraries, dummy type in case no GPU is used
+#if defined(__CUDACC__)
+using blas_handle_t = cublasHandle_t;
+using solver_handle_t = cusolverDnHandle_t;
+#elif defined(__HIPCC__)
+typedef rocblas_handle blas_handle_t;
+typedef rocsolver_handle solver_handle_t;
+#else
+typedef int blas_handle_t;
+typedef int solver_handle_t;
+#endif
+
 /** The `cublas` struct channels access to efficient basic matrix operations
  *  provided by either the cuBLAS library (after which it is named), which
  *  executes on an Nvidia GPU, rocBLAS, which executes on an AMD GPU, or by
@@ -125,20 +137,15 @@ struct cublas<policy::device, double> {
      *  \param m number of rows of A
      *  \param n number of columns of A
      */
-    static void geam(double const *A, double *C, int m, int n) {
+    static void geam(blas_handle_t &handle, double const *A, double *C, int m, int n) {
         double const alpha = 1;
         double const beta = 0;
 
         MAYBE_UNUSED cublasStatus_t stat;
-        cublasHandle_t handle;
-        stat = cublasCreate(&handle);
-        assert(CUBLAS_STATUS_SUCCESS == stat);
 
         stat = cublasDgeam(handle, CUBLAS_OP_T, CUBLAS_OP_T, n, m, &alpha, A, m,
                            &beta, A, m, C, n);
         assert(CUBLAS_STATUS_SUCCESS == stat);
-
-        cublasDestroy(handle);
     }
 
     /** Matrix matrix multiplication
@@ -149,22 +156,17 @@ struct cublas<policy::device, double> {
      *  \param n number of columns of B
      *  \param k number of columns of A, rows of B
      */
-    static void gemm(const double *A, const double *B, double *C, int m, int k,
-                     int n) {
+    static void gemm(blas_handle_t &handle, const double *A, const double *B,
+                     double *C, int m, int k, int n) {
         int lda = m, ldb = k, ldc = m;
         double alpha = 1;
         double beta = 0;
 
         MAYBE_UNUSED cublasStatus_t stat;
-        cublasHandle_t handle;
-        stat = cublasCreate(&handle);
-        assert(CUBLAS_STATUS_SUCCESS == stat);
 
         stat = cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, A,
                            lda, B, ldb, &beta, C, ldc);
         assert(CUBLAS_STATUS_SUCCESS == stat);
-
-        cublasDestroy(handle);
     }
 
     /** Matrix vector multiplication
@@ -174,8 +176,8 @@ struct cublas<policy::device, double> {
      *  \param m number of rows of A
      *  \param n number of columns of A
      */
-    static void gemv(const double *A, const double *x, double *y, int m,
-                     int n) {
+    static void gemv(blas_handle_t &handle, const double *A, const double *x,
+                     double *y, int m, int n) {
         int lda = m;
         double alpha = 1;
         double beta = 0;
@@ -183,15 +185,10 @@ struct cublas<policy::device, double> {
         int incy = 1;
 
         MAYBE_UNUSED cublasStatus_t stat;
-        cublasHandle_t handle;
-        stat = cublasCreate(&handle);
-        assert(CUBLAS_STATUS_SUCCESS == stat);
 
         stat = cublasDgemv(handle, CUBLAS_OP_N, m, n, &alpha, A, lda, x, incx,
                            &beta, y, incy);
         assert(CUBLAS_STATUS_SUCCESS == stat);
-
-        cublasDestroy(handle);
     }
 };
 #elif defined(__HIPCC__)
@@ -205,21 +202,17 @@ struct cublas<policy::device, double> {
      *  \param m number of rows of A
      *  \param n number of columns of A
      */
-    static void geam(double const *A, double *C, int m, int n) {
+    static void geam(blas_handle_t &handle, double const *A, double *C, int m,
+                     int n) {
         double const alpha = 1;
         double const beta = 0;
 
         MAYBE_UNUSED rocblas_status stat;
-        rocblas_handle handle;
-        stat = rocblas_create_handle(&handle);
-        assert(rocblas_status_success == stat);
 
         stat = rocblas_dgeam(handle, rocblas_operation_transpose,
                              rocblas_operation_transpose, n, m, &alpha, A, m,
                              &beta, A, m, C, n);
         assert(rocblas_status_success == stat);
-
-        rocblas_destroy_handle(handle);
     }
 
     /** Matrix matrix multiplication
@@ -230,23 +223,18 @@ struct cublas<policy::device, double> {
      *  \param n number of columns of B
      *  \param k number of columns of A, rows of B
      */
-    static void gemm(const double *A, const double *B, double *C, int m, int k,
-                     int n) {
+    static void gemm(blas_handle_t &handle, const double *A, const double *B,
+                     double *C, int m, int k, int n) {
         int lda = m, ldb = k, ldc = m;
         double alpha = 1;
         double beta = 0;
 
         MAYBE_UNUSED rocblas_status stat;
-        rocblas_handle handle;
-        stat = rocblas_create_handle(&handle);
-        assert(rocblas_status_success == stat);
 
         stat = rocblas_dgemm(handle, rocblas_operation_none,
                              rocblas_operation_none, m, n, k, &alpha, A, lda,
                              B, ldb, &beta, C, ldc);
         assert(rocblas_status_success == stat);
-
-        rocblas_destroy_handle(handle);
     }
 
     /** Matrix vector multiplication
@@ -256,8 +244,8 @@ struct cublas<policy::device, double> {
      *  \param m number of rows of A
      *  \param n number of columns of A
      */
-    static void gemv(const double *A, const double *x, double *y, int m,
-                     int n) {
+    static void gemv(blas_handle_t &handle, const double *A, const double *x,
+                     double *y, int m, int n) {
         int lda = m;
         double alpha = 1;
         double beta = 0;
@@ -265,15 +253,10 @@ struct cublas<policy::device, double> {
         int incy = 1;
 
         MAYBE_UNUSED rocblas_status stat;
-        rocblas_handle handle;
-        stat = rocblas_create_handle(&handle);
-        assert(rocblas_status_success == stat);
 
         stat = rocblas_dgemv(handle, rocblas_operation_none, m, n, &alpha, A,
                              lda, x, incx, &beta, y, incy);
         assert(rocblas_status_success == stat);
-
-        rocblas_destroy_handle(handle);
     }
 };
 #else
@@ -287,7 +270,8 @@ struct cublas<policy::host, double> {
      *  \param m number of rows of A
      *  \param n number of columns of A
      */
-    static void geam(double const *A, double *C, int m, int n) {
+    static void geam(blas_handle_t &handle, double const *A, double *C, int m,
+                     int n) {
         // m = m_rows, n = m_cols
         for (int i = 0; i < m; ++i) {
             for (int j = 0; j < n; ++j) {
@@ -305,8 +289,8 @@ struct cublas<policy::host, double> {
      *  \param n number of columns of B
      *  \param k number of columns of A, rows of B
      */
-    static void gemm(const double *A, const double *B, double *C, int m, int k,
-                     int n) {
+    static void gemm(blas_handle_t &handle, const double *A, const double *B,
+                     double *C, int m, int k, int n) {
         int lda = m, ldb = k, ldc = m;
         double alpha = 1;
         double beta = 0;
@@ -323,8 +307,8 @@ struct cublas<policy::host, double> {
      *  \param m number of rows of A
      *  \param n number of columns of A
      */
-    static void gemv(const double *A, const double *x, double *y, int m,
-                     int n) {
+    static void gemv(blas_handle_t &handle, const double *A, const double *x,
+                     double *y, int m, int n) {
         int lda = m;
         double alpha = 1;
         double beta = 0;
@@ -367,11 +351,8 @@ struct cusolver<policy::device, double> {
      *           serves as output for the inverse
      *  \param N size of the matrix
      */
-    static void potrf(double *A, double *B, int N) {
+    static void potrf(solver_handle_t &handle, double *A, double *B, int N) {
         MAYBE_UNUSED cusolverStatus_t stat;
-        cusolverDnHandle_t handle;
-        stat = cusolverDnCreate(&handle);
-        assert(CUSOLVER_STATUS_SUCCESS == stat);
 
         int lwork = -1;
         stat = cusolverDnDpotrf_bufferSize(handle, CUBLAS_FILL_MODE_UPPER, N, A,
@@ -392,8 +373,6 @@ struct cusolver<policy::device, double> {
                                 N, thrust_wrapper::raw_pointer_cast(info.data()));
         assert(CUSOLVER_STATUS_SUCCESS == stat);
         assert(info[0] == 0);
-
-        cusolverDnDestroy(handle);
     }
 };
 #elif defined(__HIPCC__)
@@ -411,15 +390,12 @@ struct cusolver<policy::device, double> {
      *           serves as output for the inverse
      *  \param N size of the matrix
      */
-    static void potrf(double *A, double *B, int N) {
+    static void potrf(solver_handle_t &handle, double *A, double *B, int N) {
         // copy input so that it is available twice
         thrust_wrapper::device_vector<double> C(N*N);
         thrust_wrapper::copy_n(policy::device::par(), A, N*N, C.begin());
 
         MAYBE_UNUSED rocsolver_status stat;
-        rocsolver_handle handle;
-        stat = rocsolver_create_handle(&handle);
-        assert(rocblas_status_success == stat);
 
         // Cholesky decomposition
         thrust_wrapper::device_vector<rocsolver_int> info(1);
@@ -442,8 +418,6 @@ struct cusolver<policy::device, double> {
                                 thrust_wrapper::raw_pointer_cast(ipiv.data()),
                                 B, N);
         assert(rocblas_status_success == stat);
-
-        rocblas_destroy_handle(handle);
     }
 };
 #else
@@ -459,7 +433,7 @@ struct cusolver<policy::host, double> {
      *           serves as output for the inverse
      *  \param N size of the matrix
      */
-    static void potrf(double *A, double *B, int N) {
+    static void potrf(solver_handle_t &handle, double *A, double *B, int N) {
         char uplo = 'U';
         int info;
 
@@ -525,11 +499,59 @@ private:
     size_type m_cols;
     storage_type m_data;
 
+    // Handles for GPU accelerated libraries
+    static bool libs_init_done;
+    static internal::blas_handle_t blas_handle;
+    static internal::solver_handle_t solver_handle;
+
 public:
     device_matrix() : m_rows(0), m_cols(0), m_data(m_rows * m_cols) {}
 
     explicit device_matrix(size_type rows, size_type cols)
         : m_rows(rows), m_cols(cols), m_data(m_rows * m_cols) {}
+
+    /// Checks if GPU libraries are initialized. If not, it initializes them.
+    static void initialize_gpu_libraries() {
+        if (!libs_init_done) {
+#if defined(__CUDACC__)
+            MAYBE_UNUSED cublasStatus_t blas_stat;
+            blas_stat = cublasCreate(&blas_handle);
+            assert(CUBLAS_STATUS_SUCCESS == blas_stat);
+            MAYBE_UNUSED cusolverStatus_t solver_stat;
+            solver_stat = cusolverDnCreate(&solver_handle);
+            assert(CUSOLVER_STATUS_SUCCESS == solver_stat);
+#elif defined(__HIPCC__)
+            MAYBE_UNUSED rocblas_status blas_stat;
+            blas_stat = rocblas_create_handle(&blas_handle);
+            assert(rocblas_status_success == blas_stat);
+            MAYBE_UNUSED rocsolver_status solver_stat;
+            solver_stat = rocsolver_create_handle(&solver_handle);
+            assert(rocblas_status_success == solver_stat);
+#else
+            //prevent empty function warnings
+            blas_handle = 42;
+            solver_handle = 42;
+#endif
+            libs_init_done = true;
+        }
+    }
+
+    // Cleans up GPU libraries
+    static void destroy_gpu_libraries() {
+        if (libs_init_done) {
+#if defined(__CUDACC__)
+            cublasDestroy(blas_handle);
+            cusolverDnDestroy(solver_handle);
+#elif defined(__HIPCC__)
+            rocblas_destroy_handle(blas_handle);
+            rocblas_destroy_handle(solver_handle);
+#else
+            blas_handle = 0;
+            solver_handle = 0;
+#endif
+            libs_init_done = false;
+        }
+    }
 
     reference operator()(size_type row, size_type col) noexcept {
         return m_data[row + col * m_rows];
@@ -568,6 +590,7 @@ public:
         assert(m_cols == B.m_rows);
         device_matrix C(m_rows, B.m_cols);
         internal::cublas<Policy, value_type>::gemm(
+            blas_handle,
             thrust_wrapper::raw_pointer_cast(data()),
             thrust_wrapper::raw_pointer_cast(B.data()),
             thrust_wrapper::raw_pointer_cast(C.data()), m_rows, m_cols, B.m_cols);
@@ -582,6 +605,7 @@ public:
         assert(m_cols == x.size());
         storage_type y(m_rows);
         internal::cublas<Policy, value_type>::gemv(
+            blas_handle,
             thrust_wrapper::raw_pointer_cast(data()),
             thrust_wrapper::raw_pointer_cast(x.data()),
             thrust_wrapper::raw_pointer_cast(y.data()), m_rows, m_cols);
@@ -665,6 +689,7 @@ public:
                       "BLAS/LAPACK operations");
         device_matrix C(m_cols, m_rows);
         internal::cublas<Policy, value_type>::geam(
+            blas_handle,
             thrust_wrapper::raw_pointer_cast(data()),
             thrust_wrapper::raw_pointer_cast(C.data()), m_rows, m_cols);
         return C;
@@ -680,6 +705,7 @@ public:
         device_matrix B = device_matrix::Identity(m_rows, m_cols);
 
         internal::cusolver<Policy, double>::potrf(
+            solver_handle,
             thrust_wrapper::raw_pointer_cast(A.data()),
             thrust_wrapper::raw_pointer_cast(B.data()), m_rows);
 
@@ -709,6 +735,15 @@ public:
 
     /// \}
 };
+
+// static members of device_matrix
+template <typename T, typename Policy>
+bool device_matrix<T,Policy>::libs_init_done = false;
+template <typename T, typename Policy>
+internal::blas_handle_t device_matrix<T,Policy>::blas_handle = 0;
+template <typename T, typename Policy>
+internal::solver_handle_t device_matrix<T,Policy>::solver_handle = 0;
+
 
 
 /** Read-only reference to another device_matrix object. More accurately, it
