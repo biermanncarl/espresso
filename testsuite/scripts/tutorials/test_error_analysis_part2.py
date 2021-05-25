@@ -17,22 +17,23 @@
 
 import unittest as ut
 import importlib_wrapper
-import numpy as np
 
 tutorial, skipIfMissingFeatures = importlib_wrapper.configure_and_import(
     filepath="@TUTORIALS_DIR@/error_analysis/error_analysis_part2.py",
     gpu=False,
     random_seeds=True)
 
+
 @skipIfMissingFeatures
 class Tutorial(ut.TestCase):
 
     def test(self):
-        self.assertAlmostEqual(tutorial.sem,0.025,delta=0.002)
-        self.assertAlmostEqual(tutorial.N_eff,7700,delta=500)
-        self.assertAlmostEqual(tutorial.tau_int,6.6,delta=0.4)
-        # the point of the following value in the tutorial is that it is very inaccurate, thus the high tolerance
-        self.assertAlmostEqual(tutorial.sem_2,0.37,delta=0.08)
+        self.assertAlmostEqual(tutorial.sem, 0.025, delta=0.002)
+        self.assertAlmostEqual(tutorial.N_eff, 7700, delta=500)
+        self.assertAlmostEqual(tutorial.tau_int, 6.6, delta=0.4)
+        # the point of the following value in the tutorial is that it is very
+        # inaccurate, thus the high tolerance
+        self.assertAlmostEqual(tutorial.sem_2, 0.37, delta=0.08)
 
 
 if __name__ == "__main__":
