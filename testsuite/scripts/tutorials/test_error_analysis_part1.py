@@ -58,10 +58,40 @@ class Tutorial(ut.TestCase):
         self.assertLess(abs(tutorial.PHI_1), 1.0)
         self.assertLess(abs(tutorial.PHI_2), 1.0)
 
+        # Test manual binning analysis
+        ref_bin_avgs = np.mean(
+            tutorial.time_series_1[:tutorial.N_BINS * tutorial.BIN_SIZE].reshape((tutorial.N_BINS, -1)), axis=1)
+        np.testing.assert_allclose(
+            tutorial.bin_avgs,
+            ref_bin_avgs,
+            atol=1e-12,
+            rtol=0)
+        self.assertAlmostEqual(
+            tutorial.avg,
+            np.mean(ref_bin_avgs),
+            delta=1e-10)
+        self.assertAlmostEqual(
+            tutorial.sem,
+            np.std(
+                ref_bin_avgs,
+                ddof=1.5) /
+            np.sqrt(
+                tutorial.N_BINS),
+            delta=1e-10)
+
+        # Test binning analysis function
+        for bin_size in [2, 10, 76, 100]:
+            data = np.random.random(500)
+            n_bins = 500 // bin_size
+            sem = tutorial.do_binning_analysis(data, bin_size)
+            ref_bin_avgs = np.mean(
+                data[:n_bins * bin_size].reshape((n_bins, -1)), axis=1)
+            ref_sem = np.std(ref_bin_avgs, ddof=1.5) / np.sqrt(n_bins)
+            self.assertAlmostEqual(sem, ref_sem, delta=1e-10)
+
         # The analytic expressions for the AR(1) process are taken from
         # https://en.wikipedia.org/wiki/Autoregressive_model#Example:_An_AR(1)_process
         # (accessed June 2021)
-        MU_1 = tutorial.C_1 / (1 - tutorial.PHI_1)
         SIGMA_1 = np.sqrt(tutorial.EPS_1 ** 2 / (1 - tutorial.PHI_1 ** 2))
         TAU_EXP_1 = -1 / np.log(tutorial.PHI_1)
         # The autocorrelation is exponential, thus tau_exp = tau_int, and
@@ -72,7 +102,6 @@ class Tutorial(ut.TestCase):
             tutorial.fit_params[2],
             SEM_1,
             delta=0.1 * SEM_1)
-        self.assertAlmostEqual(tutorial.avg, MU_1, delta=SEM_1 * 2.0)
 
 
 if __name__ == "__main__":
