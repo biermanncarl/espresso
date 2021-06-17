@@ -102,6 +102,13 @@ class Tutorial(ut.TestCase):
             tutorial.fit_params[2],
             SEM_1,
             delta=0.1 * SEM_1)
+        self.assertAlmostEqual(tutorial.AN_SEM_1, SEM_1, delta=1e-10 * SEM_1)
+
+        SIGMA_2 = np.sqrt(tutorial.EPS_2 ** 2 / (1 - tutorial.PHI_2 ** 2))
+        TAU_EXP_2 = -1 / np.log(tutorial.PHI_2)
+        SEM_2 = np.sqrt(2 * SIGMA_2 ** 2 * TAU_EXP_2 / tutorial.N_SAMPLES)
+
+        self.assertAlmostEqual(tutorial.AN_SEM_2, SEM_2, delta=1e-10 * SEM_2)
 
 
 if __name__ == "__main__":
